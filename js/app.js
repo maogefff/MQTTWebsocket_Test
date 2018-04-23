@@ -18,12 +18,12 @@
 
 var websocketclient = {
     // 对象属性
-    'client': null,
-    'lastMessageId': 1,
-    'lastSubId': 1,
-    'subscriptions': [],   //数组
-    'messages': [],
-    'connected': false,
+    'client': null,     //mqtt对象
+    'lastMessageId': 1, 
+    'lastSubId': 1,    //最新订阅的ID
+    'subscriptions': [],   //所有订阅的主题的数组
+    'messages': [],        //所有消息的对象数组
+    'connected': false,   //连接状态
 
     // 对象方法
     'connect': function () {
@@ -59,7 +59,9 @@ var websocketclient = {
 
         // mqttws31.js
         this.client = new Messaging.Client(host, port, clientId);
+        //设置断开链接时的回调函数
         this.client.onConnectionLost = this.onConnectionLost;
+        //设置接收到消息后的回调函数
         this.client.onMessageArrived = this.onMessageArrived;
         // 参数的对象
         var options = {
@@ -84,7 +86,7 @@ var websocketclient = {
             willmsg.retained = lwRetain;
             options.willMessage = willmsg;
         }
-
+        //连接
         this.client.connect(options);
     },
 
@@ -144,7 +146,9 @@ var websocketclient = {
         };
 
         console.log(messageObj);
+        //更新web界面
         messageObj.id = websocketclient.render.message(messageObj);
+        //放入消息数组
         websocketclient.messages.push(messageObj);
     },
 
@@ -153,44 +157,49 @@ var websocketclient = {
         this.client.disconnect();
     },
 
+    //发布消息
     'publish': function (topic, payload, qos, retain) {
         console.log("--------进入publish--------------");
         if (!websocketclient.connected) {
             websocketclient.render.showError("Not connected");
             return false;
         }
-
+        //创建一个mqtt格式消息
         var message = new Messaging.Message(payload);
         message.destinationName = topic;
         message.qos = qos;
         message.retained = retain;
+        //发送
         this.client.send(message);
     },
-
+    // 订阅主题
     'subscribe': function (topic, qosNr, color) {
         console.log("--------进入subscribe--------------");
+        //未连接，错误
         if (!websocketclient.connected) {
             websocketclient.render.showError("Not connected");
             return false;
         }
-
+        //主题为空，弹窗错误返回
         if (topic.length < 1) {
             websocketclient.render.showError("Topic cannot be empty");
             return false;
         }
-
+        //订阅过相同主题，错误
         if (_.find(this.subscriptions, { 'topic': topic })) {
             websocketclient.render.showError('You are already subscribed to this topic');
             return false;
         }
-
+        //将主题加入到mqtt协议中去
         this.client.subscribe(topic, {qos: qosNr});
         if (color.length < 1) {
             color = '999999';
         }
-
+        //创建一个订阅的对象
         var subscription = {'topic': topic, 'qos': qosNr, 'color': color};
+        //在web界面增加一个显示订阅的主题
         subscription.id = websocketclient.render.subscription(subscription);
+        //加入数组
         this.subscriptions.push(subscription);
         return true;
     },
@@ -315,6 +324,7 @@ var websocketclient = {
 
             console.log("--------进入render.subscription--------------");
             var largest = websocketclient.lastSubId++;
+            // 向订阅的主题列表中增加一个
             $("#innerEdit").append(
                 '<li class="subLine" id="sub' + largest + '">' +
                     '   <div class="row large-12 subs' + largest + '" style="border-left: solid 10px #' + subscription.color + '; background-color: #ffffff">' +
@@ -327,6 +337,7 @@ var websocketclient = {
                     '       </div>' +
                     '   </div>' +
                     '</li>');
+            //返回id
             return largest;
         },
 
